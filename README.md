@@ -63,7 +63,7 @@ func inner(ctx context.Context) {
 
 func outer() {
     ctx := context.Background()
-	ctxMyKey.WithBox(ctx)
+    ctxMyKey.WithBox(ctx)
 
     inner(ctx)
 

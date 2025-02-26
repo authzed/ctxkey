@@ -7,13 +7,20 @@ import (
 	"fmt"
 )
 
-// SettableContext is an interface for a context that can have a value set.
-type SettableContext[V any] interface {
-	WithValue(ctx context.Context, val V) context.Context
+// ContextWith is an interface for producting functions that can add a value to
+// a context.Context.
+type ContextWith[V any] interface {
+	With(val V) func(ctx context.Context) context.Context
+}
+
+// ContextSet is an interface for types that can be used to add a value directly
+// to a context.Context.
+type ContextSet[V any] interface {
+	Set(ctx context.Context, val V) context.Context
 }
 
 // Key is a type that is used as a key in a context.Context for a
-// specific type of value V. It mimics the context.Context interface
+// specific type of value V.
 type Key[V any] struct{}
 
 // New creates a new Key
@@ -21,9 +28,16 @@ func New[V any]() *Key[V] {
 	return &Key[V]{}
 }
 
-// WithValue adds a value to the context for this key.
-func (k *Key[V]) WithValue(ctx context.Context, val V) context.Context {
+// Set adds a value to the context for this key.
+func (k *Key[V]) Set(ctx context.Context, val V) context.Context {
 	return context.WithValue(ctx, k, val)
+}
+
+// With returns a fn that adds a value to the context for this key.
+func (k *Key[V]) With(val V) func(ctx context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return k.Set(ctx, val)
+	}
 }
 
 // Value retrieves the value from the context for this key. It returns the value
@@ -56,9 +70,16 @@ func NewWithDefault[V comparable](defaultValue V) *DefaultingKey[V] {
 	}
 }
 
-// WithValue adds a value to the context for this key.
-func (k *DefaultingKey[V]) WithValue(ctx context.Context, val V) context.Context {
+// Set adds a value to the context for this key.
+func (k *DefaultingKey[V]) Set(ctx context.Context, val V) context.Context {
 	return context.WithValue(ctx, k, val)
+}
+
+// With returns a fn that adds a value to the context for this key.
+func (k *DefaultingKey[V]) With(val V) func(ctx context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return k.Set(ctx, val)
+	}
 }
 
 // Value retrieves the value from the context for this key. If the value is not
@@ -103,8 +124,8 @@ func NewBoxedWithDefault[V any](defaultValue V) *BoxedKey[V] {
 	}
 }
 
-// WithValue adds a value to the context for this key.
-func (k *BoxedKey[V]) WithValue(ctx context.Context, val V) context.Context {
+// Set adds a boxed value to the context for this key.
+func (k *BoxedKey[V]) Set(ctx context.Context, val V) context.Context {
 	handle, ok := ctx.Value(k).(*Box[V])
 	if ok {
 		handle.value = val
@@ -113,9 +134,23 @@ func (k *BoxedKey[V]) WithValue(ctx context.Context, val V) context.Context {
 	return context.WithValue(ctx, k, &Box[V]{value: val})
 }
 
-// WithBox adds a box to the context for this key.
-func (k *BoxedKey[V]) WithBox(ctx context.Context) context.Context {
+// With returns a fn that adds boxed value to the context for this key.
+func (k *BoxedKey[V]) With(val V) func(ctx context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return k.Set(ctx, val)
+	}
+}
+
+// SetBox adds a default boxed value to the context for this key.
+func (k *BoxedKey[V]) SetBox(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k, &Box[V]{value: k.defaultValue})
+}
+
+// WithBox adds a box with the default value to the context for this key.
+func (k *BoxedKey[V]) WithBox() func(ctx context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return k.SetBox(ctx)
+	}
 }
 
 // Value retrieves the value from the context for this key. If the value is not
@@ -127,4 +162,16 @@ func (k *BoxedKey[V]) Value(ctx context.Context) V {
 	}
 
 	return handle.value
+}
+
+// With takes a list of functions that modify a context and returns a new
+// function that applies all of them. This can be used with the `.With(value)`
+// methods on keys to apply multiple values to a context.
+func With(values ...func(context.Context) context.Context) func(ctx context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		for _, f := range values {
+			ctx = f(ctx)
+		}
+		return ctx
+	}
 }

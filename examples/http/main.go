@@ -38,7 +38,7 @@ func authorizeUserMiddleware(next http.Handler) http.Handler {
 		ctxLogger.MustNonEmptyValue(r.Context()).Info("authorizing user", "name", name)
 
 		user := &User{ID: 1, Name: name}
-		r = r.WithContext(ctxAuthorizedUser.WithValue(r.Context(), *user))
+		r = r.WithContext(ctxAuthorizedUser.Set(r.Context(), *user))
 		next.ServeHTTP(w, r)
 	})
 }
@@ -47,7 +47,7 @@ func authorizeUserMiddleware(next http.Handler) http.Handler {
 func bytesWrittenLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// carve out a spot in the context for the value to be written
-		r = r.WithContext(ctxBytesWritten.WithBox(r.Context()))
+		r = r.WithContext(ctxBytesWritten.SetBox(r.Context()))
 
 		// run the wrapped handler
 		next.ServeHTTP(w, r)
@@ -68,7 +68,7 @@ var helloHandler http.HandlerFunc = func(w http.ResponseWriter, req *http.Reques
 	}
 
 	// fill in the "box" that is already present in the ctx
-	ctxBytesWritten.WithValue(req.Context(), written)
+	ctxBytesWritten.Set(req.Context(), written)
 }
 
 func main() {

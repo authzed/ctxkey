@@ -44,7 +44,7 @@ func ExampleNew() {
 	// the compute handler performs some computation that we wish to re-use
 	computeHandler := NewHandlerFromFunc(func(ctx context.Context) {
 		myComputedExpensiveObject := ExpensiveComputation{result: "computed"}
-		ctx = CtxExpensiveObject.WithValue(ctx, &myComputedExpensiveObject)
+		ctx = CtxExpensiveObject.Set(ctx, &myComputedExpensiveObject)
 		useHandler.Handle(ctx)
 	}, "compute")
 
@@ -70,7 +70,7 @@ func ExampleNewWithDefault() {
 		fmt.Println(CtxExpensiveObject.MustNonEmptyValue(ctx).result)
 
 		myComputedExpensiveObject := ExpensiveComputation{result: "computed"}
-		ctx = CtxExpensiveObject.WithValue(ctx, &myComputedExpensiveObject)
+		ctx = CtxExpensiveObject.Set(ctx, &myComputedExpensiveObject)
 
 		useHandler.Handle(ctx)
 	}, "compute")
@@ -90,12 +90,12 @@ func ExampleNewBoxedWithDefault() {
 	// the compute handler performs some computation that we wish to re-use
 	computeHandler := NewHandlerFromFunc(func(ctx context.Context) {
 		myComputedExpensiveObject := ExpensiveComputation{result: "computed"}
-		CtxExpensiveObject.WithValue(ctx, &myComputedExpensiveObject)
+		CtxExpensiveObject.Set(ctx, &myComputedExpensiveObject)
 	}, "compute")
 
 	decorateHandler := NewHandlerFromFunc(func(ctx context.Context) {
 		// adds an empty box
-		ctx = CtxExpensiveObject.WithBox(ctx)
+		ctx = CtxExpensiveObject.WithBox()(ctx)
 
 		// fills in the box with the value
 		computeHandler.Handle(ctx)
@@ -117,7 +117,7 @@ func TestNew(t *testing.T) {
 		_ = ctxKey.MustValue(ctx)
 	})
 
-	ctx = ctxKey.WithValue(ctx, "value")
+	ctx = ctxKey.Set(ctx, "value")
 	if ctxKey.MustValue(ctx) != "value" {
 		t.Fatal("expected value")
 	}
@@ -144,7 +144,7 @@ func TestNewWithDefault(t *testing.T) {
 
 	nonDefaultValue := "non-default"
 
-	ctx = ctxKey.WithValue(ctx, &nonDefaultValue)
+	ctx = ctxKey.Set(ctx, &nonDefaultValue)
 
 	if *ctxKey.MustNonEmptyValue(ctx) != "non-default" {
 		t.Fatal("expected value")
@@ -167,13 +167,13 @@ func TestNewBoxedWithDefault(t *testing.T) {
 		t.Fatal("expected nil")
 	}
 
-	ctx = ctxKey.WithBox(ctx)
+	ctx = ctxKey.SetBox(ctx)
 	if ctxKey.Value(ctx) != nil {
 		t.Fatal("expected nil")
 	}
 
 	value := "value"
-	ctx = ctxKey.WithValue(ctx, &value)
+	ctx = ctxKey.With(&value)(ctx)
 	if *ctxKey.Value(ctx) != "value" {
 		t.Fatal("expected value")
 	}
@@ -184,9 +184,37 @@ func TestNewBoxedWithDefault(t *testing.T) {
 	}
 
 	ctxKeySetBoxAndValueTogether := NewBoxedWithDefault[*string](nil)
-	ctx = ctxKeySetBoxAndValueTogether.WithValue(ctx, &value)
+	ctx = ctxKeySetBoxAndValueTogether.With(&value)(ctx)
 	if *ctxKeySetBoxAndValueTogether.Value(ctx) != "value" {
 		t.Fatal("expected value")
+	}
+}
+
+func TestWith(t *testing.T) {
+	key1 := New[string]()
+	key2 := NewWithDefault[string]("")
+	key3 := NewBoxedWithDefault[string]("")
+	key4 := NewWithDefault[string]("testDefault")
+
+	ctx := context.Background()
+	ctx = With(
+		key1.With("value1"),
+		With(
+			key2.With("value2"),
+			key3.With("value3"),
+		),
+	)(ctx)
+	if key1.MustValue(ctx) != "value1" {
+		t.Fatal("expected value1")
+	}
+	if key2.MustNonEmptyValue(ctx) != "value2" {
+		t.Fatal("expected value2")
+	}
+	if key3.Value(ctx) != "value3" {
+		t.Fatal("expected value3")
+	}
+	if key4.MustNonEmptyValue(ctx) != "testDefault" {
+		t.Fatal("expected testDefault")
 	}
 }
 

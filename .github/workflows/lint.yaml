@@ -8,7 +8,7 @@ on:  # yamllint disable-line rule:truthy
   pull_request:
     branches: ["*"]
 env:
-  GO_VERSION: "~1.23.4"
+  GO_VERSION: "~1.24.13"
 jobs:
   lint:
     name: "Lint"

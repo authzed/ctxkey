@@ -21,7 +21,9 @@ type ContextSet[V any] interface {
 
 // Key is a type that is used as a key in a context.Context for a
 // specific type of value V.
-type Key[V any] struct{}
+type Key[V any] struct {
+	_ int // ensures each instance has a unique address
+}
 
 // New creates a new Key
 func New[V any]() *Key[V] {

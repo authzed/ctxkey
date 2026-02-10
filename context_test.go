@@ -233,3 +233,30 @@ func expectPanic(t testing.TB, f func()) {
 	}()
 	wg.Wait()
 }
+
+func TestKeyUniqueness(t *testing.T) {
+	// Create two separate keys with the same type
+	key1 := New[string]()
+	key2 := New[string]()
+
+	// These should be different keys
+	if key1 == key2 {
+		t.Fatal("two separate keys have the same memory address!")
+	}
+
+	// They should store independent values
+	ctx := context.Background()
+	ctx = key1.Set(ctx, "value1")
+	ctx = key2.Set(ctx, "value2")
+
+	// Each key should retrieve its own value
+	val1, ok1 := key1.Value(ctx)
+	if !ok1 || val1 != "value1" {
+		t.Fatalf("key1 should return 'value1', got %q (ok=%v)", val1, ok1)
+	}
+
+	val2, ok2 := key2.Value(ctx)
+	if !ok2 || val2 != "value2" {
+		t.Fatalf("key2 should return 'value2', got %q (ok=%v)", val2, ok2)
+	}
+}
